@@ -12,52 +12,42 @@ var WeMo = function(ip, port) {
 WeMo.SearchTimeout = 5000; /* msec */
 WeMo.ST = 'urn:Belkin:service:basicevent:1';
 
+var client = new SSDP();
+client.setMaxListeners(0);
+
+client.on('response', function (headers) {
+	if (headers.ST === WeMo.ST) {
+		var location = url.parse(headers.LOCATION);
+		request.get(location.href, function(err, res, xml) {
+			xml2js.parseString(xml, function(err, json) {
+				var device = { ip: location.hostname, port: location.port };
+				for (var key in json.root.device[0]) {
+					device[key] = json.root.device[0][key][0];
+				}
+				client.emit('found', device);
+			});
+		});
+	}
+});
+
 WeMo.Search = function(friendlyName, callback) {
 	if (friendlyName !== undefined) {
 		return WeMo.SearchByFriendlyName(friendlyName, callback);
 	}
 
-	var client = new SSDP();
-
-	client.setMaxListeners(0);
-	client.on('response', function (msg, rinfo) {
-		msg = msg.split('\r\n').reduce(function(map, item) {
-			var data = item.match(/^(.*?): (.*?)$/);
-			if (data) map[data[1]] = data[2];
-			return map;
-		}, {});
-		if (msg.ST === WeMo.ST) {
-			var location = url.parse(msg.LOCATION);
-			request.get(location.href, function(err, res, xml) {
-				xml2js.parseString(xml, function(err, json) {
-					var device = { ip: location.hostname, port: location.port };
-					for (var key in json.root.device[0]) {
-						device[key] = json.root.device[0][key][0];
-					}
-					client.emit('found', device);
-				});
-			});
-		}
-	});
 	client.search(WeMo.ST);
 	return client;
 };
 
 WeMo.SearchByFriendlyName = function(name, callback) {
 	var client = WeMo.Search();
-	client.exit = function() {
-		client.stop();
-		client.stop = function() {};
-	};
 	var timer = setTimeout(function() {
 		callback('WeMoSearchTimeoutError', null);
-		client.exit();
 	}, WeMo.SearchTimeout);
 	client.once('found', function(device) {
 		if (device.friendlyName === name) {
 			clearTimeout(timer);
 			callback(null, device);
-			client.exit();
 		}
 	});
 	return client;

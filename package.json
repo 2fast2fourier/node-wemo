@@ -7,7 +7,7 @@
   },
   "main": "wemo",
   "dependencies": {
-	"node-ssdp": "git://github.com/2fast2fourier/node-ssdp.git#c42efc0",
+	"node-ssdp": "~2.0.1",
 	"request": "~2.36.0",
 	"xml2js": "~0.4.4"
   },
