@@ -15,14 +15,9 @@ WeMo.ST = 'urn:Belkin:service:basicevent:1';
 var client = new SSDP();
 client.setMaxListeners(0);
 
-client.on('response', function (msg, rinfo) {
-	msg = msg.split('\r\n').reduce(function(map, item) {
-		var data = item.match(/^(.*?): (.*?)$/);
-		if (data) map[data[1]] = data[2];
-		return map;
-	}, {});
-	if (msg.ST === WeMo.ST) {
-		var location = url.parse(msg.LOCATION);
+client.on('response', function (headers) {
+	if (headers.ST === WeMo.ST) {
+		var location = url.parse(headers.LOCATION);
 		request.get(location.href, function(err, res, xml) {
 			xml2js.parseString(xml, function(err, json) {
 				var device = { ip: location.hostname, port: location.port };
@@ -48,13 +43,11 @@ WeMo.SearchByFriendlyName = function(name, callback) {
 	var client = WeMo.Search();
 	var timer = setTimeout(function() {
 		callback('WeMoSearchTimeoutError', null);
-		client.stop();
 	}, WeMo.SearchTimeout);
 	client.once('found', function(device) {
 		if (device.friendlyName === name) {
 			clearTimeout(timer);
 			callback(null, device);
-			client.stop();
 		}
 	});
 	return client;
